@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Planificador Financiero Modular</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="manifest" href="manifest.json" />
+  <meta name="theme-color" content="#1a73e8" />
+  <!-- Librería Chart.js para gráficos avanzados -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+  <div class="container">
+    <div class="card">
+      <header>
+        <div>
+          <h1>Planificador Mensual</h1>
+          <p class="subtitle">Control de gastos, ingresos extras y gráficos</p>
+        </div>
+        <div class="header-btns">
+          <button class="btn btn-primary" onclick="openCategoryModal()">+ Nueva Categoría</button>
+          <button class="btn" onclick="resetAll()">Vaciar Todo</button>
+        </div>
+      </header>
+
+      <!-- Alerta de Vencimientos Proactiva -->
+      <div id="alertContainer"></div>
+
+      <!-- Resumen Principal -->
+      <div class="hero-grid">
+        <div class="metric-box highlight" id="boxMargen">
+          <div class="metric-label">Disponible / Margen libre</div>
+          <div class="metric-value" id="valMargen">$0</div>
+          <div class="metric-sub" id="valRatio">Margen libre: 0%</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">Total gastos cargados</div>
+          <div class="metric-value" id="valTotalGastos">$0</div>
+          <div class="metric-sub" id="valDiasNecesarios">Equivale a 0 días de trabajo</div>
+        </div>
+        <div class="metric-box">
+          <div class="metric-label">Ingreso mensual total</div>
+          <div class="metric-value" id="valIngresoHero">$0</div>
+          <div class="metric-sub" id="valSubIngreso">Base + Extras</div>
+        </div>
+      </div>
+
+      <!-- Bloque de Ingresos Base -->
+      <div class="income-box">
+        <div class="income-inputs-grid">
+          <div class="income-field">
+            <label for="dailyIncomeInput">Ingreso promedio por día</label>
+            <div class="input-group">
+              <span>$</span>
+              <input type="number" id="dailyIncomeInput" step="1000" min="0" value="50000" oninput="onDailyChange(this.value)" />
+            </div>
+          </div>
+          <div class="income-field">
+            <label for="daysWorkedInput">Días trabajados al mes</label>
+            <div class="input-group">
+              <input type="number" id="daysWorkedInput" step="1" min="0" max="31" value="20" oninput="onDaysChange(this.value)" />
+              <span class="unit-label">días</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="quick-days">
+          <span>Atajos de días:</span>
+          <button class="day-chip" onclick="setDays(18)">18 días</button>
+          <button class="day-chip" onclick="setDays(20)">20 días</button>
+          <button class="day-chip" onclick="setDays(22)">22 días</button>
+          <button class="day-chip" onclick="setDays(24)">24 días</button>
+          <button class="day-chip" onclick="setDays(26)">26 días</button>
+        </div>
+      </div>
+
+      <!-- Bloque de Ingresos Inesperados / Extras -->
+      <div class="income-box" style="background: #f0fdf4; border-color: #bbf7d0; margin-bottom: 22px;">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <div>
+            <div style="font-weight: 700; font-size: 0.95rem; color: #166534;">Ingresos Inesperados / Extras</div>
+            <div style="font-size: 0.78rem; color: #15803d;">Ventas, changas o plata extra recibida en el mes</div>
+          </div>
+          <button class="btn btn-sm" style="background: #10b981; color: white; border: none;" onclick="openExtraIncomeModal()">+ Agregar Ingreso Extra</button>
+        </div>
+        <div id="extraIncomesContainer">
+          <!-- Aquí se cargan dinámicamente -->
+        </div>
+      </div>
+
+      <!-- Contenedor de Categorías de Gastos -->
+      <div class="section-title-row">
+        <div class="section-title">Tus Categorías y Gastos</div>
+      </div>
+
+      <div id="emptyState" class="empty-state">
+        <p>Todavía no tenés categorías creadas.</p>
+        <p class="empty-sub">Hacé clic en <strong>"+ Nueva Categoría"</strong> arriba a la derecha para empezar.</p>
+      </div>
+
+      <div id="categoriesContainer"></div>
+
+      <!-- Sección de Gráfico Avanzado con Chart.js -->
+      <div class="chart-section card-inner-section" style="margin-top: 28px; padding-top: 20px; border-top: 1px solid var(--border);">
+        <div class="chart-header">
+          <span>Distribución Porcentual (Gráfico de Torta)</span>
+          <span id="labelPctUsado">0% asignado</span>
+        </div>
+        <div style="position: relative; height: 260px; width: 100%; display: flex; justify-content: center; align-items: center; margin-top: 12px;">
+          <canvas id="advancedPieChart"></canvas>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 1: Crear Nueva Categoría -->
+  <div class="modal-overlay" id="categoryModal">
+    <div class="modal">
+      <h3>Nueva Categoría y Gasto</h3>
+      <div class="modal-group">
+        <label for="newCatName">Nombre de la categoría / gasto</label>
+        <input type="text" id="newCatName" placeholder="Ej: Vencimientos Fijos, Seguro" />
+      </div>
+      <div class="modal-group">
+        <label for="newCatAmount">Monto inicial ($)</label>
+        <input type="number" id="newCatAmount" step="500" min="0" value="50000" />
+      </div>
+      <div class="modal-group">
+        <label for="newCatDueDay">Día de vencimiento (1 al 31) - Opcional</label>
+        <input type="number" id="newCatDueDay" min="0" max="31" placeholder="Ej: 10" />
+      </div>
+      <div class="modal-group">
+        <label for="newCatColor">Color en la gráfica</label>
+        <select id="newCatColor">
+          <option value="#1a73e8">Azul</option>
+          <option value="#e11d48">Rojo / Carmesí</option>
+          <option value="#f59e0b">Amarillo / Ámbar</option>
+          <option value="#10b981">Verde Esmeralda</option>
+          <option value="#8b5cf6">Violeta</option>
+          <option value="#06b6d4">Celeste</option>
+          <option value="#f97316">Naranja</option>
+        </select>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeCategoryModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="createCategory()">Crear Categoría</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 2: Agregar Gasto Adicional -->
+  <div class="modal-overlay" id="itemModal">
+    <div class="modal">
+      <h3 id="itemModalTitle">Agregar Gasto Adicional</h3>
+      <div class="modal-group">
+        <label for="newItemName">Nombre del ítem</label>
+        <input type="text" id="newItemName" placeholder="Ej: Cuota extra" />
+      </div>
+      <div class="modal-group">
+        <label for="newItemAmount">Monto inicial ($)</label>
+        <input type="number" id="newItemAmount" step="100" min="0" value="0" />
+      </div>
+      <div class="modal-group">
+        <label for="newItemDueDay">Día de vencimiento (1 al 31) - Opcional</label>
+        <input type="number" id="newItemDueDay" min="0" max="31" placeholder="Ej: 15" />
+      </div>
+      <div class="modal-group">
+        <label for="newItemMax">Tope máximo del deslizador ($)</label>
+        <input type="number" id="newItemMax" step="10000" min="1000" value="200000" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeItemModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="createItem()">Agregar Gasto</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Agregar Ingreso Extra / Inesperado -->
+  <div class="modal-overlay" id="extraIncomeModal">
+    <div class="modal">
+      <h3>Nuevo Ingreso Extra</h3>
+      <div class="modal-group">
+        <label for="newExtraName">Concepto o descripción</label>
+        <input type="text" id="newExtraName" placeholder="Ej: Venta de artículo, Changa" />
+      </div>
+      <div class="modal-group">
+        <label for="newExtraAmount">Monto recibido ($)</label>
+        <input type="number" id="newExtraAmount" step="500" min="0" value="10000" />
+      </div>
+      <div class="modal-actions">
+        <button class="btn" onclick="closeExtraIncomeModal()">Cancelar</button>
+        <button class="btn btn-primary" onclick="createExtraIncome()">Guardar Ingreso</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js")
+          .then(() => console.log("Service Worker registrado con éxito."))
+          .catch((err) => console.log("Fallo al registrar Service Worker:", err));
+      });
+    }
+  </script>
+</body>
+</html>
